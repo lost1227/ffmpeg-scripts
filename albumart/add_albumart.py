@@ -1,28 +1,38 @@
-import glob, os
+from pathlib import Path
 import subprocess
+import shutil
 
 # Helpful: https://www.covermytunes.com/
 # Potential future project: automatically pull covers based on metadata
 
-indir = 'in'
-outdir = 'out'
+script_dir = Path(__file__).resolve().parent
+
+indir = script_dir / 'in'
+outdir = script_dir / 'out'
+
 cover = 'cover'
 extensions = ['.png', '.jpg']
 
-mp3files = glob.glob(indir + '/*.mp3')
-
-coverpath = ""
+coverpath = None
 
 for extension in extensions:
-    path = os.path.join(indir, cover + extension)
-    if os.path.isfile(path):
+    path = indir / (cover + extension)
+    if path.is_file():
         coverpath = path
+        break
 
-for mp3path in mp3files:
-    basepath = os.path.splitext(mp3path)[0]
+if coverpath is None or not coverpath.is_file():
+    print("Could not locate cover")
+    exit(1)
     
-    outpath = os.path.join(outdir, os.path.basename(basepath) + ".mp3")
-    cmd = ['ffmpeg', 
+if outdir.exists():
+    shutil.rmtree(outdir)
+
+outdir.mkdir()
+
+for mp3path in indir.glob("*.mp3"):
+    outpath = outdir / mp3path.name
+    completion = subprocess.run(['ffmpeg', 
             '-i', mp3path,
             '-i', coverpath,
             '-map', '0:a',
@@ -33,8 +43,9 @@ for mp3path in mp3files:
             "-id3v2_version", "3",
             "-metadata:s:v", "title=cover",
             "-metadata:s:v", "comment=Cover (front)",
-            outpath]
-    
-    #print(cmd)
-    subprocess.run(cmd)
-    print('\n')
+            outpath
+            ])
+    if completion.returncode != 0:
+        print("ffmpeg error")
+        exit(1)
+    print()
